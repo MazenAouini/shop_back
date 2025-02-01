@@ -5,8 +5,10 @@ import cloudinary from "cloudinary";
 import path from "path";
 import fs from 'fs';
 import connectDB from "./configs/db.js";
+import authRoutes from './Routes/authRoutes.js';
 import subscriptionRoutes from './Routes/SubscriptionRoute.js';
 import productRoutes from './Routes/ProductRoute.js';
+import protect from './middleware/authMiddleware.js';
 
 // Load env vars
 dotenv.config();
@@ -32,8 +34,10 @@ app.get("/health", (req, res) => {
     res.send({ message: "health OK!" });
 });
 // Add routes
+app.use('/api/auth', authRoutes);
 app.use('/api/subscription', subscriptionRoutes);
-app.use('/api/products', productRoutes);
+// Protected routes
+app.use('/api/products', protect, productRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -41,12 +45,21 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Something broke!', error: err.message });
 });
 
-// Start server only after DB connection
+// Start server with port handling
 const startServer = async () => {
     try {
         await connectDB();
-        app.listen(PORT, () => {
+        
+        const server = app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.log(`Port ${PORT} is busy, trying ${PORT + 1}`);
+                server.listen(PORT + 1);
+            } else {
+                console.error('Failed to start server:', err);
+                process.exit(1);
+            }
         });
     } catch (error) {
         console.error('Failed to start server:', error);
