@@ -3,17 +3,27 @@ import Subscriber from '../Models/SubscriptionModel.js';
 import nodemailer from 'nodemailer'
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
+import dotenv from 'dotenv';
+dotenv.config();
 
 
 const transporter = nodemailer.createTransport({
-    service: 'Gmail', // Use your email service (e.g., Gmail, SendGrid)
+    service: 'gmail',
     auth: {
-      user: process.env.EMAIL_USER, // Store in .env
-      pass: process.env.EMAIL_PASS, // Store in .env
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
     },
+    tls: {
+      rejectUnauthorized: false
+    }
   });
   
   const sendNewProductNotification = async (subscribers, product) => {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log('Email credentials not configured, skipping notification');
+      return;
+    }
+  
     const mailOptions = {
       from: process.env.EMAIL_USER,
       subject: 'New Product Alert!',
@@ -26,9 +36,10 @@ const transporter = nodemailer.createTransport({
         mailOptions.to = subscriber.email;
         await transporter.sendMail(mailOptions);
       }
-      console.log('Emails sent successfully');
+      console.log('Notification emails sent successfully');
     } catch (error) {
-      console.error('Error sending emails:', error);
+      console.error('Error sending notification emails:', error);
+      // Don't throw the error - just log it so it doesn't break the product creation
     }
   };
 
@@ -53,6 +64,14 @@ const Create = async (req, res) => {
       });
     }
 
+    // Validate required fields
+    if (!name || !price || !mark || !category || !sizes) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
     const result = await cloudinary.uploader.upload(file.path, {
       folder: "products",
       use_filename: true,
@@ -73,7 +92,7 @@ const Create = async (req, res) => {
       category,
       sizes: parsedSizes,
       image: [result.secure_url],
-      createdBy: req.user.id // Add creator reference
+      createdBy: req.user.id
     });
 
     const subscribers = await Subscriber.find({});
@@ -93,7 +112,8 @@ const Create = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to add product",
+      error: error.stack
     });
   }
 };

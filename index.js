@@ -9,7 +9,7 @@ import authRoutes from './Routes/authRoutes.js';
 import subscriptionRoutes from './Routes/SubscriptionRoute.js';
 import productRoutes from './Routes/ProductRoute.js';
 import protect from './middleware/authMiddleware.js';
-
+import AdminRouter from './Routes/Admin.Route.js'
 // Load env vars
 dotenv.config();
 
@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 7000;
 // Middleware
 app.use(express.json());
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3004'], // Allow both ports
+    origin: ['http://localhost:3000', 'http://localhost:3001'], // Allow both ports
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
 }));
@@ -38,6 +38,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 // Protected routes
 app.use('/api/products', protect, productRoutes);
+app.use('/api/admin', AdminRouter);
+
+const uploadsDir = 'uploads';
+if (!fs.existsSync(uploadsDir)){
+    fs.mkdirSync(uploadsDir);
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -54,8 +60,9 @@ const startServer = async () => {
             console.log(`Server is running on port ${PORT}`);
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
-                console.log(`Port ${PORT} is busy, trying ${PORT + 1}`);
-                server.listen(PORT + 1);
+                const nextPort = Number(PORT) + 1;  // Convert to number before adding
+                console.log(`Port ${PORT} is busy, trying ${nextPort}`);
+                server.listen(nextPort);
             } else {
                 console.error('Failed to start server:', err);
                 process.exit(1);
